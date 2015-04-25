@@ -1,58 +1,68 @@
 from flask import Flask
 from flask.ext.restful import reqparse, abort, Api, Resource
+from datetime import datetime, timedelta
+from bs4 import BeautifulSoup as bs
+import urllib.request as r
 
 app = Flask(__name__)
 api = Api(app)
 
-TODOS = {
-    'todo1': {'task': 'build an API'},
-    'todo2': {'task': '???????'},
-    'todo3': {'task': 'profit!'}
-}
-
-def abort_if_todo_doesnt_exist(todo_id):
-    if todo_id not in TODOS:
-        abort(404, message="Todo {} doesn't exist".format(todo_id))
-
 parser = reqparse.RequestParser()
-parser.add_argument('task', type=str)
+parser.add_argument('user_id', type=str)
+parser.add_argument('restaurant', type=str)
 
-
-# Todo
-#   show a single todo item and lets you delete them
-class Todo(Resource):
-    def get(self, todo_id):
-        abort_if_todo_doesnt_exist(todo_id)
-        return TODOS[todo_id]
-
-    def delete(self, todo_id):
-        abort_if_todo_doesnt_exist(todo_id)
-        return '', 204
-
-    def put(self, todo_id):
-        args = parser.parse_args()
-        task = {'task': args['task']}
-        TODOS[todo_id] = task
-        return task, 201
-
-# TodoList
-#   shows a list of all todos, and lets you POST to add new tasks
-class TodoList(Resource):
-    def get(self):
-        return TODOS
-
+class Review(Resource):
     def post(self):
         args = parser.parse_args()
-        todo_id = int(max(TODOS.keys()).lstrip('todo')) + 1
-        todo_id = 'todo%i' % todo_id
-        TODOS[todo_id] = {'task': args['task']}
-        return TODOS[todo_id], 201
+        user_id = args['user_id']
+        today = datetime.now()
+        biz = args['restaurant']
 
-##
-## Actually setup the Api resource routing here
-##
-api.add_resource(TodoList, '/todos')
-api.add_resource(Todo, '/todos/<todo_id>')
+        # logic
+        url = 'http://www.yelp.com/user_details?userid={}'.format(user_id)
+        page = r.urlopen(url)
+        soup = bs(page.read())
+
+        reviews = soup.find('ul', 'reviews')
+
+        if reviews:
+            reviews_stripped = [reviews.contents[i] for i in range(1,len(reviews.contents)-1, 2)]
+
+            for review in reviews_stripped:
+                # Get the business
+                key = review.find_all('a', href=True)[0]['href'][5:]
+                if key == biz:
+                    print(key, biz)
+                    # Get the date
+                    date = review.find_all('span','rating-qualifier')[0].contents[0].strip()
+                    print(datetime.now(), datetime.strptime(date, '%m/%d/%Y'))
+                    print((datetime.now() - datetime.strptime(date, '%m/%d/%Y')),timedelta(1))
+                    if (datetime.now() - datetime.strptime(date, '%m/%d/%Y')) < timedelta(1):
+                        print('got in')
+                        result = dict()
+                        # Get the user's rating
+                        result['rating'] = review.find_all('i')[0]['class'][1][-1]
+                        # Finally get the review
+                        result['review'] = "".join(str(i) for i in review.find_all('p')[0].contents).replace("<br>","").replace("</br>","")
+                        return result, 200
+
+        return {'result':'review not found'}, 200
+
+class User(Resource):
+    def get(self, user_id):
+        url = 'http://www.yelp.com/user_details?userid={}'.format(user_id)
+        page = r.urlopen(url)
+        soup = bs(page.read())
+
+        result = dict()
+        result["imageURL"] = soup.findAll(id="main_user_photo_in_about_user_column")[0]['src'].replace('ms.jpg','o.jpg')
+        result["name"] = soup.h1.contents[0].strip().replace("'s Profile", "")
+        return result, 200
+
+
+
+api.add_resource(Review, '/reviewcheck')
+api.add_resource(User, '/user/<user_id>')
 
 if __name__ == '__main__':
     app.run(debug=True)
