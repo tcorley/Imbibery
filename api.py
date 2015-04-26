@@ -57,6 +57,7 @@ class User(Resource):
         result = dict()
         result["imageURL"] = soup.findAll(id="main_user_photo_in_about_user_column")[0]['src'].replace('ms.jpg','o.jpg')
         result["name"] = soup.h1.contents[0].strip().replace("'s Profile", "")
+        result["userid"] = user_id
         return result, 200
 
 
