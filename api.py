@@ -37,7 +37,8 @@ class Review(Resource):
                     date = review.find_all('span','rating-qualifier')[0].contents[0].strip()
                     print(datetime.now(), datetime.strptime(date, '%m/%d/%Y'))
                     print((datetime.now() - datetime.strptime(date, '%m/%d/%Y')),timedelta(1))
-                    if (datetime.now() - datetime.strptime(date, '%m/%d/%Y')) < timedelta(1):
+                    # if (datetime.now() - datetime.strptime(date, '%m/%d/%Y')) < timedelta(1):
+                    if True:
                         print('got in')
                         result = dict()
                         # Get the user's rating
